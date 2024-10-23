@@ -1,0 +1,72 @@
+services:
+  inference:
+    build:
+      context: ./inference
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=qwen2.5:0.5b
+      - QDRANT_ENDPOINT=knowledge_base
+      - QDRANT_PORT=6333
+      - QDRANT_COLLECTION=hotmart
+    depends_on:
+      init_container:
+        condition: service_completed_successfully
+    networks:
+      - rag
+  
+  ingestion:
+    build:
+      context: ./ingestion
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=qwen2.5:0.5b
+      - QDRANT_ENDPOINT=knowledge_base
+      - QDRANT_PORT=6333
+      - QDRANT_COLLECTION=hotmart
+    depends_on:
+      init_container:
+        condition: service_completed_successfully
+    networks:
+      - rag
+
+  init_container:
+    build:
+      context: ./init_container
+      dockerfile: Dockerfile
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=qwen2.5:0.5b
+      - QDRANT_ENDPOINT=knowledge_base
+      - QDRANT_PORT=6333
+      - QDRANT_COLLECTION=hotmart
+      - DEFAULT_INGEST_FILES_PATH=/files
+    volumes:
+      - ./etc/site_sections:/files
+    networks:
+      - rag
+    depends_on:
+      - knowledge_base
+      - ollama
+    
+
+  knowledge_base:
+    image: qdrant/qdrant:v1.12.1
+    networks:
+      - rag
+
+  ollama:
+    image: ollama/ollama:0.3.14
+    volumes:
+      - ./etc/ollama:/root/.ollama
+    networks:
+      - rag
+
+networks:
+  rag:
+    driver: bridge
